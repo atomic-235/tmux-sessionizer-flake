@@ -1,0 +1,13 @@
+[package]
+name = "tmux-sessionizer"
+version = "0.1.0"
+edition = "2021"
+description = "Fuzzy-select a project directory and open it in tmux"
+license = "MIT"
+
+[dependencies]
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
