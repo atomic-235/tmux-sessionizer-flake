@@ -6,7 +6,9 @@ built static by CI and published as a single release binary.
 The source lives in this repo. The Rust crate has no dependencies, and the
 release binary is linked with `-C target-feature=+crt-static` against
 `glibc.static`, so it carries no `/nix/store` interpreter and runs wherever it
-is downloaded.
+is downloaded. The asset is a `.tar.gz` because static glibc still embeds
+glibc's locale/gconv/getconf paths, and Nix only honours
+`unsafeDiscardReferences` in recursive hashing mode.
 
 ## Packages
 

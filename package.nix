@@ -12,20 +12,19 @@ let
 
   asset =
     {
-      x86_64-linux = "tmux-sessionizer-linux-x86_64";
+      x86_64-linux = "tmux-sessionizer-linux-x86_64.tar.gz";
     }
     .${system} or (throw "tmux-sessionizer: unsupported system ${system}");
 
   url = "https://github.com/atomic-235/tmux-sessionizer-flake/releases/download/v${data.version}/${asset}";
 
-  # Fixed-output fetch at build time. The static glibc binary still embeds
-  # glibc's locale/gconv/getconf paths, which makes Nix's reference check
-  # reject it unless the check is waived; fetchurl does not accept
-  # unsafeDiscardReferences, hence the flat stdenv.mkDerivation.
-  binary = stdenv.mkDerivation {
+  # Fixed-output fetch at build time. Recursive hashing (not flat) is required
+  # because the static glibc binary embeds glibc's locale/gconv/getconf paths,
+  # and Nix only honours unsafeDiscardReferences in recursive mode.
+  tarball = stdenv.mkDerivation {
     name = "tmux-sessionizer-${data.version}-${asset}";
 
-    outputHashMode = "flat";
+    outputHashMode = "recursive";
     outputHashAlgo = "sha256";
     outputHash = data.assets.${system};
     unsafeDiscardReferences = true;
@@ -42,13 +41,11 @@ stdenvNoCC.mkDerivation {
   pname = "tmux-sessionizer";
   version = data.version;
 
-  src = binary;
-  dontUnpack = true;
-  dontStrip = true;
+  src = tarball;
 
   installPhase = ''
     runHook preInstall
-    install -Dm755 "$src" "$out/bin/tmux-sessionizer"
+    install -Dm755 tmux-sessionizer "$out/bin/tmux-sessionizer"
     runHook postInstall
   '';
 
