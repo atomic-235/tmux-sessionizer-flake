@@ -7,7 +7,8 @@
 //! Layout of a session:
 //!   bash — plain shell
 //!   nvim — the editor window
-//!   ai   — the AI CLI window
+//!
+//! The AI window is created on demand by a tmux binding, not here.
 //!
 //! Zero dependencies on purpose: the whole program is `std` only.
 
@@ -30,6 +31,10 @@ fn main() {
 }
 
 fn run() -> io::Result<()> {
+    if env::args().nth(1).as_deref() == Some("--ai") {
+        return run_ai();
+    }
+
     let arg = env::args().nth(1).unwrap_or_else(|| DEFAULT_DIR.to_string());
     let expanded = expand_user(&arg);
     let search_dir = expanded
@@ -106,22 +111,6 @@ fn run() -> io::Result<()> {
             "C-m",
         ]);
 
-        tmux(&["new-window", "-t", &session_name, "-n", "ai", "-c", &selected]);
-        // "/share," in $TMUX marks the work server (its socket path lives
-        // under .../share,...), which gets a different AI CLI.
-        let ai_cmd = if env::var("TMUX").unwrap_or_default().contains("/share,") {
-            env::var("SESSIONIZER_AI_CMD_WORK").unwrap_or_else(|_| "work-opencode".to_string())
-        } else {
-            env::var("SESSIONIZER_AI_CMD").unwrap_or_else(|_| "opencode".to_string())
-        };
-        tmux(&[
-            "send-keys",
-            "-t",
-            &format!("{session_name}:ai"),
-            &ai_cmd,
-            "C-m",
-        ]);
-
         tmux(&["select-window", "-t", &format!("{session_name}:bash")]);
         // PROJECT_ROOT is consumed by a project's .tmux file when the user
         // sources it manually (prefix T). Never source it automatically: a
@@ -136,6 +125,34 @@ fn run() -> io::Result<()> {
     }
 
     tmux(&["switch-client", "-t", &session_name]);
+    Ok(())
+}
+
+/// Focus the `ai` window, creating it and starting the agent if it is absent.
+/// Bound to prefix+O; session creation never starts the agent.
+fn run_ai() -> io::Result<()> {
+    let socket = capture("tmux", &["display-message", "-p", "#{socket_path}"])?;
+    let socket = String::from_utf8_lossy(&socket.stdout);
+    // "/share," in the socket path marks the work server.
+    let command = if socket.contains("/share,") {
+        env::var("SESSIONIZER_AI_CMD_WORK").unwrap_or_else(|_| "work-opencode".to_string())
+    } else {
+        env::var("SESSIONIZER_AI_CMD").unwrap_or_else(|_| "opencode".to_string())
+    };
+
+    let windows = capture("tmux", &["list-windows", "-F", "#{window_name}"])?;
+    if String::from_utf8_lossy(&windows.stdout)
+        .lines()
+        .any(|name| name == "ai")
+    {
+        tmux(&["select-window", "-t", "ai"]);
+        return Ok(());
+    }
+
+    let dir = capture("tmux", &["display-message", "-p", "#{pane_current_path}"])?;
+    let dir = String::from_utf8_lossy(&dir.stdout).trim().to_string();
+    tmux(&["new-window", "-n", "ai", "-c", &dir]);
+    tmux(&["send-keys", "-t", "ai", &command, "C-m"]);
     Ok(())
 }
 
