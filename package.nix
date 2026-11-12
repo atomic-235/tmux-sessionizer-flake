@@ -42,6 +42,8 @@ stdenvNoCC.mkDerivation {
   version = data.version;
 
   src = tarball;
+  # The archive contains a single file, not a directory.
+  sourceRoot = ".";
 
   installPhase = ''
     runHook preInstall
