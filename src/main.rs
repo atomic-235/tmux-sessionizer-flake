@@ -98,10 +98,13 @@ fn run() -> io::Result<()> {
         tmux(&["new-window", "-t", &session_name, "-n", "nvim", "-c", &selected]);
 
         let project = Path::new(&selected);
+        // SESSIONIZER_NVIM_CMD lets a consumer prefix a wrapper (for example a
+        // credential proxy) without the sessionizer knowing about it.
+        let nvim = env::var("SESSIONIZER_NVIM_CMD").unwrap_or_else(|_| "nvim".to_string());
         let nvim_cmd = if project.join(".envrc").is_file() {
-            "direnv exec . nvim . || nvim .".to_string()
+            format!("direnv exec . {nvim} . || {nvim} .")
         } else {
-            "nvim .".to_string()
+            format!("{nvim} .")
         };
         tmux(&[
             "send-keys",
